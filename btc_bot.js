@@ -1,5 +1,18 @@
 const rp = require('request-promise');
-const {CMC_PRO_API_KEY, SLACK_WEBHOOK} = require('./config.js')
+const fs = require('fs')
+var csvWriter = require('csv-write-stream')
+
+const {CMC_PRO_API_KEYS} = require('./config.js')
+const RAND_KEY = CMC_PRO_API_KEYS[Math.floor(Math.random() * CMC_PRO_API_KEYS.length)]
+
+const CSV_PATH = process.env.CSV_PATH;
+
+var writer = null;
+if (!fs.existsSync(CSV_PATH))
+  writer = csvWriter({ headers: ["price", "timestamp"]});
+else
+  writer = csvWriter({sendHeaders: false});
+
 
 const requestOptions = {
   method: 'GET',
@@ -10,26 +23,21 @@ const requestOptions = {
     'convert': 'USD'
   },
   headers: {
-    'X-CMC_PRO_API_KEY': CMC_PRO_API_KEY
+    'X-CMC_PRO_API_KEY': RAND_KEY
   },
   json: true,
   gzip: true
 };
 
-console.log(CMC_PRO_API_KEY);
-console.log(SLACK_WEBHOOK);
-
 rp(requestOptions).then(response => {
-  console.log('[', response.status.timestamp, '] Bitcoin Price:', response.data[0].quote.USD.price);
-  const slackOptions = {
-    method: 'POST',
-    uri: SLACK_WEBHOOK,
-    body: {
-      text: '[' + response.status.timestamp + '] Bitcoin Price: *' + response.data[0].quote.USD.price + '*',
-    },
-    json: true,
-  }
-  rp(slackOptions);
+  var timestamp = response.status.timestamp;
+  var price = response.data[0].quote.USD.price;
+  console.log('[', timestamp, '] Bitcoin Price:', price);
+
+  writer.pipe(fs.createWriteStream(CSV_PATH, {flags: 'a'}))
+  writer.write({price: price, timestamp: timestamp})
+  writer.end()
+
 }).catch((err) => {
   console.log('API call error:', err.message);
 });

@@ -1,3 +1,4 @@
 slack_webhook.txt
 node_modules
 config.js
+venv
